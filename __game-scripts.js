@@ -5,6 +5,7 @@ Movement.attributes.add("speed", {
   default: 450,
   description: "Controls the movement speed",
 });
+
 Movement.attributes.add("jumpForce", {
   type: "number",
   default: 5,
@@ -13,11 +14,13 @@ Movement.attributes.add("jumpForce", {
 
 Movement.prototype.initialize = function () {
   this.force = new pc.Vec3();
-  this.isJumpable = !1;
+  this.isJumpable = false;
   this.spawnPoint = this.entity.getPosition().clone();
   this.entity.rigidbody.linearDamping = 0.6;
   this.entity.rigidbody.angularDamping = 0.6;
   this.entity.collision.on("collisionstart", this.onCollisionStart, this);
+  // 엔티티가 초기화된 후에 window.movePlayer를 설정합니다.
+  window.movePlayer = this.movePlayer.bind(this);
 };
 
 Movement.prototype.resetForces = function () {
@@ -26,33 +29,55 @@ Movement.prototype.resetForces = function () {
 };
 
 Movement.prototype.onCollisionStart = function (t) {
-  t.other.rigidbody && (this.isJumpable = !0);
+  if (t.other.rigidbody) {
+    this.isJumpable = true;
+  }
 };
 
 Movement.prototype.onTriggerEnter = function (t) {
-  t.tags.has("plain") &&
-    (this.resetForces(),
-    this.entity.rigidbody.teleport(this.spawnPoint),
-    this.app.fire("player:reset"));
+  if (t.tags.has("plain")) {
+    this.resetForces();
+    this.entity.rigidbody.teleport(this.spawnPoint);
+    this.app.fire("player:reset");
+  }
 };
 
 Movement.prototype.update = function (t) {
   var e = 0,
     i = 0;
-  this.entity.getPosition().y < 0.5 &&
-    (this.resetForces(),
-    this.entity.rigidbody.teleport(this.spawnPoint),
-    this.app.fire("player:reset"));
-  this.app.keyboard.isPressed(pc.KEY_LEFT) && (e = -this.speed * t);
-  this.app.keyboard.isPressed(pc.KEY_RIGHT) && (e = this.speed * t);
-  this.app.keyboard.isPressed(pc.KEY_UP) && (i = -this.speed * t);
-  this.app.keyboard.isPressed(pc.KEY_DOWN) && (i = this.speed * t);
+  if (this.entity.getPosition().y < 0.5) {
+    this.resetForces();
+    this.entity.rigidbody.teleport(this.spawnPoint);
+    this.app.fire("player:reset");
+  }
   this.force.set(e, 0, i);
   this.entity.rigidbody.applyForce(this.force);
-  this.isJumpable &&
-    (this.entity.rigidbody.applyImpulse(0, this.jumpForce, 0),
-    (this.isJumpable = !1));
+  if (this.isJumpable) {
+    this.entity.rigidbody.applyImpulse(0, this.jumpForce, 0);
+    this.isJumpable = false;
+  }
 };
+
+// 외부에서 호출할 수 있는 movePlayer 함수 수정
+Movement.prototype.movePlayer = function (direction) {
+  console.log("movePlayer called with direction: " + direction); // 로그 추가
+  var t = this.app.timeScale;
+  var e = 0,
+    i = 0; // i로 통일
+  if (direction === "left") {
+    e = -this.speed * t;
+  } else if (direction === "right") {
+    e = this.speed * t;
+  } else if (direction === "up") {
+    i = -this.speed * t;
+  } else if (direction === "down") {
+    i = this.speed * t;
+  }
+  this.force.set(e, 0, i);
+  this.entity.rigidbody.applyForce(this.force);
+  console.log("Force applied: " + this.force.toString()); // Force 적용 로그 추가
+};
+
 
 var onGoalAchieve = pc.createScript("onGoalAchieve");
 
